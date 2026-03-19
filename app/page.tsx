@@ -140,7 +140,6 @@ export default function LandingPage() {
             {[
               { value: "48,320개", label: "리뷰 분석 완료" },
               { value: "1,200개", label: "앱 분석" },
-              { value: "평균 4분", label: "소요 시간" },
             ].map((stat, i) => (
               <div key={i} className="flex items-center gap-1.5">
                 {i > 0 && <span className="text-[#E5E7EB] select-none">·</span>}
