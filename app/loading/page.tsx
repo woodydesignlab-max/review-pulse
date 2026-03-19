@@ -58,8 +58,12 @@ function LoadingContent() {
       .then((data: AnalysisReport) => {
         trackEvent("analyze_success", {
           app_id: decodedUrl,
+          app_name: data.app.name,
+          store: data.app.store,
           avg_rating: data.summary.avgRating,
+          sample_avg_rating: data.summary.sampleAvgRating,
           sample_count: data.summary.sampleCount,
+          negative_ratio: data.summary.negativeRatio,
         });
         // Store result for dashboard to consume
         sessionStorage.setItem("analysisResult", JSON.stringify(data));

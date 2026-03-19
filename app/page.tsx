@@ -226,6 +226,7 @@ export default function LandingPage() {
           <button
             onClick={() => {
               const sampleUrl = "https://play.google.com/store/apps/details?id=com.kakaobank.channel";
+              trackEvent("analyze_click", { app_id: sampleUrl, source: "sample_button" });
               router.push(`/loading?url=${encodeURIComponent(sampleUrl)}`);
             }}
             className="flex items-center justify-center gap-2 w-full border border-[#EAECF0] text-[14px] text-[#374151] font-medium rounded-2xl py-3.5 hover:bg-[#F9FAFB] transition-colors"
