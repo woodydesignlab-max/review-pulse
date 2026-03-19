@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnalysisReport } from "@/types";
+import { trackEvent } from "@/lib/gtag";
 import Header from "@/components/layout/Header";
 import SectionCard from "@/components/layout/SectionCard";
 import KpiCard from "@/components/dashboard/KpiCard";
@@ -59,7 +60,17 @@ export default function DashboardPage() {
   useEffect(() => {
     const raw = sessionStorage.getItem("analysisResult");
     if (!raw) { setError(true); return; }
-    try { setData(JSON.parse(raw)); } catch { setError(true); }
+    try {
+      const parsed: AnalysisReport = JSON.parse(raw);
+      setData(parsed);
+      trackEvent("view_result", {
+        app_name: parsed.app.name,
+        store: parsed.app.store,
+        avg_rating: parsed.summary.avgRating,
+        sample_avg_rating: parsed.summary.sampleAvgRating,
+        negative_ratio: parsed.summary.negativeRatio,
+      });
+    } catch { setError(true); }
   }, []);
 
   // ── Error state ──────────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnalysisReport } from "@/types";
+import { trackEvent } from "@/lib/gtag";
 
 // Steps to show in UI (purely cosmetic — advance on a timer)
 const STEPS = [
@@ -55,6 +56,11 @@ function LoadingContent() {
         return res.json();
       })
       .then((data: AnalysisReport) => {
+        trackEvent("analyze_success", {
+          app_id: decodedUrl,
+          avg_rating: data.summary.avgRating,
+          sample_count: data.summary.sampleCount,
+        });
         // Store result for dashboard to consume
         sessionStorage.setItem("analysisResult", JSON.stringify(data));
         sessionStorage.setItem("analysisUrl", decodedUrl);

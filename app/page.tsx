@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { trackEvent } from "@/lib/gtag";
 
 export default function LandingPage() {
   const [url, setUrl] = useState("");
@@ -37,6 +38,7 @@ export default function LandingPage() {
       return;
     }
     setError("");
+    trackEvent("analyze_click", { app_id: url.trim() });
     router.push(`/loading?url=${encodeURIComponent(url.trim())}`);
   };
 
