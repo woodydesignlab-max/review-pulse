@@ -46,16 +46,26 @@ function LoadingContent() {
     setTimeout(advanceStep, STEPS[0].duration);
 
     // Actual API call
+    console.log("[analyze] request start:", decodedUrl);
+    console.log("[analyze] detected store:", decodedUrl.includes("apps.apple.com") ? "App Store" : "Google Play");
+
     fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: decodedUrl }),
     })
-      .then((res) => {
-        if (!res.ok) return res.json().then((e) => Promise.reject(e.error || "분석 실패"));
-        return res.json();
+      .then(async (res) => {
+        console.log("[analyze] response status:", res.status);
+        const json = await res.json() as { success: boolean; report?: AnalysisReport; source?: string; store?: string; error?: string };
+        console.log("[analyze] response shape — success:", json.success, "| store:", json.store, "| source:", json.source, "| hasReport:", !!json.report);
+        if (!res.ok || !json.success) {
+          return Promise.reject(json.error || "분석 실패");
+        }
+        return json;
       })
-      .then((data: AnalysisReport) => {
+      .then((json) => {
+        const data = json.report!;
+        console.log("[analyze] success — app:", data.app?.name, "| reviews:", data.summary?.sampleCount);
         trackEvent("analyze_success", {
           app_id: decodedUrl,
           app_name: data.app.name,
@@ -74,7 +84,9 @@ function LoadingContent() {
         setTimeout(() => router.push("/dashboard"), 700);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "분석 중 오류가 발생했습니다.");
+        const msg = typeof err === "string" ? err : "분석 중 오류가 발생했습니다.";
+        console.error("[analyze] fail reason:", msg, err);
+        setError(msg);
       });
   }, [url, decodedUrl, router]);
 

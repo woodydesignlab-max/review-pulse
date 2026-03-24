@@ -31,16 +31,21 @@ export default function LandingPage() {
     return "Google Play 또는 App Store 앱 링크만 지원합니다.";
   };
 
-  const handleAnalyze = () => {
-    const validationError = validateUrl(url);
+  const submitAnalyze = (targetUrl: string) => {
+    const validationError = validateUrl(targetUrl);
     if (validationError) {
       setError(validationError);
+      console.warn("[analyze] validation fail:", validationError, targetUrl);
       return;
     }
     setError("");
-    trackEvent("analyze_click", { app_id: url.trim() });
-    router.push(`/loading?url=${encodeURIComponent(url.trim())}`);
+    const storeLabel = targetUrl.includes("apps.apple.com") ? "App Store" : "Google Play";
+    console.log("[analyze] submit:", storeLabel, targetUrl);
+    trackEvent("analyze_click", { app_id: targetUrl, store: storeLabel });
+    router.push(`/loading?url=${encodeURIComponent(targetUrl)}`);
   };
+
+  const handleAnalyze = () => submitAnalyze(url.trim());
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleAnalyze();
@@ -251,10 +256,7 @@ export default function LandingPage() {
             {exampleApps.map((app) => (
               <button
                 key={app.name}
-                onClick={() => {
-                  setUrl(app.url);
-                  setError("");
-                }}
+                onClick={() => submitAnalyze(app.url)}
                 className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full transition-colors border ${
                   app.store === "App Store"
                     ? "text-[#0071E3] bg-[#F0F7FF] hover:bg-[#DBEAFE] border-[#BFDBFE]"

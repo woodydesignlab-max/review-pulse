@@ -52,13 +52,13 @@ export async function POST(req: Request) {
 
     // ── 입력 검증 ──────────────────────────────────────────────────────
     if (!url || typeof url !== "string") {
-      return Response.json({ error: "앱 링크를 입력해주세요." }, { status: 400 });
+      return Response.json({ success: false, error: "앱 링크를 입력해주세요." }, { status: 400 });
     }
 
     const storeType = detectStoreType(url.trim());
     if (!storeType) {
       return Response.json(
-        { error: "Google Play 또는 App Store 링크만 지원합니다." },
+        { success: false, error: "Google Play 또는 App Store 링크만 지원합니다." },
         { status: 400 }
       );
     }
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     const appId = extractAppId(url.trim(), storeType);
     if (!appId) {
       return Response.json(
-        { error: "앱 ID를 추출할 수 없습니다. 링크를 확인해주세요." },
+        { success: false, error: "앱 ID를 추출할 수 없습니다. 링크를 확인해주세요." },
         { status: 400 }
       );
     }
@@ -81,15 +81,15 @@ export async function POST(req: Request) {
 
     const { report, source } = await scrape(appId, storeType, { country });
 
-    // 응답 헤더에 데이터 출처 표시 (개발 중 디버깅용)
-    return Response.json(report, {
-      status: 200,
-      headers: { "X-Data-Source": source },
-    });
+    // 응답: 항상 { success, report, source, store } 구조로 반환
+    return Response.json(
+      { success: true, report, source, store: storeType },
+      { status: 200, headers: { "X-Data-Source": source } }
+    );
   } catch (err) {
     console.error("[/api/analyze] Unhandled error:", err);
     return Response.json(
-      { error: "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
+      { success: false, error: "분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요." },
       { status: 500 }
     );
   }
