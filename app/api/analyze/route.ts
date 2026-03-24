@@ -79,11 +79,13 @@ export async function POST(req: Request) {
 
     console.log(`[route] storeType=${storeType}, appId=${appId}, country=${country}`);
 
-    const { report, source } = await scrape(appId, storeType, { country });
+    const { report, source, mockReason } = await scrape(appId, storeType, { country });
+
+    console.log(`[route] source=${source}${mockReason ? ` | mockReason=${mockReason}` : ""}`);
 
     // 응답: 항상 { success, report, source, store } 구조로 반환
     return Response.json(
-      { success: true, report, source, store: storeType },
+      { success: true, report, source, store: storeType, ...(mockReason ? { mockReason } : {}) },
       { status: 200, headers: { "X-Data-Source": source } }
     );
   } catch (err) {

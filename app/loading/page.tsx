@@ -56,8 +56,11 @@ function LoadingContent() {
     })
       .then(async (res) => {
         console.log("[analyze] response status:", res.status);
-        const json = await res.json() as { success: boolean; report?: AnalysisReport; source?: string; store?: string; error?: string };
+        const json = await res.json() as { success: boolean; report?: AnalysisReport; source?: string; store?: string; error?: string; mockReason?: string };
         console.log("[analyze] response shape — success:", json.success, "| store:", json.store, "| source:", json.source, "| hasReport:", !!json.report);
+        if (json.source === "mock" && json.mockReason) {
+          console.warn("[analyze] ⚠️  mock fallback 이유:", json.mockReason);
+        }
         if (!res.ok || !json.success) {
           return Promise.reject(json.error || "분석 실패");
         }
@@ -79,6 +82,12 @@ function LoadingContent() {
         const serialized = JSON.stringify(data);
         sessionStorage.setItem("analysisResult", serialized);
         sessionStorage.setItem("analysisUrl", decodedUrl);
+        sessionStorage.setItem("analysisSource", json.source ?? "unknown");
+        if (json.mockReason) {
+          sessionStorage.setItem("analysisMockReason", json.mockReason);
+        } else {
+          sessionStorage.removeItem("analysisMockReason");
+        }
         console.log("[analyze] sessionStorage 저장 완료 — bytes:", serialized.length);
         console.log("[analyze] 검증:", {
           hasApp: !!data.app,

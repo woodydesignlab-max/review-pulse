@@ -53,10 +53,12 @@ const IconTrend = () => (
 );
 
 export default function DashboardPage() {
-  const [data, setData]         = useState<AnalysisReport | null>(null);
-  const [error, setError]       = useState<string | null>(null);
-  const [debugRaw, setDebugRaw] = useState<string | null>(null);
-  const [period, setPeriod]     = useState<PeriodKey>("30d");
+  const [data, setData]             = useState<AnalysisReport | null>(null);
+  const [error, setError]           = useState<string | null>(null);
+  const [debugRaw, setDebugRaw]     = useState<string | null>(null);
+  const [period, setPeriod]         = useState<PeriodKey>("30d");
+  const [isMock, setIsMock]         = useState(false);
+  const [mockReason, setMockReason] = useState<string | null>(null);
 
   useEffect(() => {
     console.log("[dashboard] useEffect 실행");
@@ -86,6 +88,13 @@ export default function DashboardPage() {
         hasInsights: !!parsed.insights,
       });
       setData(parsed);
+      const source = sessionStorage.getItem("analysisSource");
+      const reason = sessionStorage.getItem("analysisMockReason");
+      if (source === "mock") {
+        setIsMock(true);
+        setMockReason(reason);
+        console.warn("[dashboard] ⚠️  mock 데이터 표시 중. 이유:", reason);
+      }
       trackEvent("view_result", {
         app_name: parsed.app.name,
         store: parsed.app.store,
@@ -169,6 +178,28 @@ export default function DashboardPage() {
               {JSON.stringify({ app, summary: { ...summary }, trendDataKeys: Object.keys(trendData ?? {}) }, null, 2)}
             </pre>
           </details>
+        )}
+
+        {/* ── Mock 데이터 경고 배너 ──────────────────────────────────── */}
+        {isMock && (
+          <div className="flex items-start gap-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl px-4 py-3">
+            <svg className="shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 3L16 15H2L9 3Z" fill="#F59E0B" opacity=".2"/>
+              <path d="M9 3L16 15H2L9 3Z" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round"/>
+              <path d="M9 7.5V10.5M9 12V12.5" stroke="#92400E" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <div>
+              <p className="text-[13px] font-semibold text-[#92400E]">샘플 데이터로 표시 중</p>
+              <p className="text-[12px] text-[#B45309] mt-0.5">
+                실제 리뷰를 수집하지 못해 샘플 데이터를 보여드리고 있어요.
+              </p>
+              {mockReason && (
+                <p className="text-[11px] text-[#92400E] mt-1 font-mono bg-[#FEF3C7] rounded px-2 py-1 break-all">
+                  {mockReason}
+                </p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ── App Info Card ──────────────────────────────────────────── */}
