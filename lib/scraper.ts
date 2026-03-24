@@ -48,7 +48,8 @@ async function loadMockTemplate(): Promise<AnalysisReport> {
  */
 export async function scrape(
   appId: string,
-  storeType: "google_play" | "app_store"
+  storeType: "google_play" | "app_store",
+  extraOptions?: { country?: string }
 ): Promise<{ report: AnalysisReport; source: "real" | "mock" }> {
   const mockTemplate = await loadMockTemplate();
 
@@ -67,7 +68,7 @@ export async function scrape(
         newestCount: 250,
         ratingCount: 150,
         language: "ko",
-        country: "kr",
+        country: extraOptions?.country ?? "kr",
       });
       console.log(
         `[scraper] 수집 완료: ${result.reviews.length}개 리뷰 ` +

@@ -10,6 +10,7 @@
     "test:app-store": "tsx scripts/test-app-store.ts"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.5.9",
     "google-play-scraper": "^10.1.2",
     "next": "16.2.0",
     "react": "19.2.4",

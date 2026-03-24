@@ -11,9 +11,10 @@
 import { scrape } from "@/lib/scraper";
 
 // ── 스토어 타입 감지 ──────────────────────────────────────────────────────
+// "apps.apple.com" 포함 시 무조건 App Store로 분기
 function detectStoreType(url: string): "google_play" | "app_store" | null {
-  if (url.includes("play.google.com/store/apps")) return "google_play";
   if (url.includes("apps.apple.com")) return "app_store";
+  if (url.includes("play.google.com/store/apps")) return "google_play";
   return null;
 }
 
@@ -26,7 +27,7 @@ function extractAppId(url: string, storeType: "google_play" | "app_store"): stri
       return parsed.searchParams.get("id");
     }
     if (storeType === "app_store") {
-      // https://apps.apple.com/kr/app/toss/id839333328
+      // https://apps.apple.com/kr/app/.../id1460766549
       const match = parsed.pathname.match(/\/id(\d+)/);
       return match ? match[1] : null;
     }
@@ -34,6 +35,13 @@ function extractAppId(url: string, storeType: "google_play" | "app_store"): stri
     // URL 파싱 실패
   }
   return null;
+}
+
+// ── App Store country 코드 추출 ───────────────────────────────────────────
+// https://apps.apple.com/kr/app/... → "kr"
+function extractAppStoreCountry(url: string): string {
+  const match = url.match(/apps\.apple\.com\/([a-z]{2})\//i);
+  return match ? match[1].toLowerCase() : "kr";
 }
 
 // ── POST 핸들러 ───────────────────────────────────────────────────────────
@@ -64,10 +72,14 @@ export async function POST(req: Request) {
     }
 
     // ── 수집 + 분석 ────────────────────────────────────────────────────
-    // scrape() 내부에서:
-    //   - GOOGLE_PLAY_ENABLED=true  → 실제 수집 시도 → 실패 시 mock fallback
-    //   - GOOGLE_PLAY_ENABLED 없음  → 즉시 mock 반환
-    const { report, source } = await scrape(appId, storeType);
+    // App Store는 country 코드를 URL에서 추출해서 options에 전달
+    const country = storeType === "app_store"
+      ? extractAppStoreCountry(url.trim())
+      : "kr";
+
+    console.log(`[route] storeType=${storeType}, appId=${appId}, country=${country}`);
+
+    const { report, source } = await scrape(appId, storeType, { country });
 
     // 응답 헤더에 데이터 출처 표시 (개발 중 디버깅용)
     return Response.json(report, {

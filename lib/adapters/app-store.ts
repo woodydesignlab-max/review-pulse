@@ -1,85 +1,77 @@
 /**
  * lib/adapters/app-store.ts
  *
- * Apple App Store 어댑터.
- * iTunes RSS Feed를 사용해 리뷰와 앱 정보를 수집.
+ * Apple App Store 어댑터 — XML RSS 기반
  *
- * ┌──────────────────────────────────────────────────────────────┐
- * │  RSS Feed URL:                                               │
- * │  https://itunes.apple.com/kr/rss/customerreviews/           │
- * │    page={n}/id={APP_ID}/sortby=mostrecent/json              │
- * │                                                              │
- * │  앱 정보 URL (iTunes Lookup API):                            │
- * │  https://itunes.apple.com/lookup?id={APP_ID}&country=kr     │
- * └──────────────────────────────────────────────────────────────┘
+ * RSS URL:
+ *   page 1:  https://itunes.apple.com/{country}/rss/customerreviews/id={APP_ID}/sortby=mostrecent/xml
+ *   page 2+: https://itunes.apple.com/{country}/rss/customerreviews/page={n}/id={APP_ID}/sortby=mostrecent/xml
  *
- * 수집 전략:
- *   최신순(mostrecent) RSS 페이지를 최대 10페이지 순차 수집.
- *   각 페이지당 최대 50개 리뷰. 빈 페이지가 나오면 조기 종료.
- *
- * Fallback: RSS 실패 시 HTML scraping 시도 없음 (명시적 요구사항).
+ * 파싱: fast-xml-parser
+ * fallback: JSON 시도 없음. XML만 사용.
  */
 
+import { XMLParser } from "fast-xml-parser";
 import { StoreAdapter, AdapterResult, RawReview, RawAppInfo, FetchOptions } from "./types";
 
 // ── 상수 ────────────────────────────────────────────────────────────────
-const MAX_PAGES = 10;
-const RSS_BASE  = "https://itunes.apple.com/kr/rss/customerreviews";
+const MAX_PAGES   = 10;
 const LOOKUP_BASE = "https://itunes.apple.com/lookup";
+const RSS_BASE    = "https://itunes.apple.com";
 
-// ── iTunes RSS 응답 타입 ─────────────────────────────────────────────────
-interface RssEntry {
-  id?:            { label?: string };
-  title?:         { label?: string };
-  content?:       { label?: string };
-  "im:rating"?:  { label?: string };
-  "im:version"?: { label?: string };
-  author?:        { name?: { label?: string } };
-  updated?:       { label?: string };
-  // 첫 번째 entry는 앱 정보이므로 im:name이 존재
-  "im:name"?:     { label?: string };
+// ── XML 파서 ─────────────────────────────────────────────────────────────
+// content 요소가 같은 entry 안에 type="text" / type="html" 두 번 등장하므로 배열 강제
+const xmlParser = new XMLParser({
+  ignoreAttributes:  false,
+  attributeNamePrefix: "@_",
+  isArray: (name) => ["entry", "content", "link"].includes(name),
+  processEntities:   true,
+  htmlEntities:      true,
+  // HTML content 내부 태그를 파싱하지 않고 텍스트로 유지
+  stopNodes:         ["*.content"],
+});
+
+// ── 내부 타입 ─────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = Record<string, any>;
+
+// ── country 추출 (App Store URL에서) ────────────────────────────────────
+// https://apps.apple.com/kr/app/... → "kr"
+function extractCountry(appUrl: string): string {
+  const match = appUrl.match(/apps\.apple\.com\/([a-z]{2})\//i);
+  return match ? match[1].toLowerCase() : "kr";
 }
 
-interface RssFeed {
-  feed?: {
-    entry?: RssEntry[] | RssEntry;
-  };
-}
-
-// ── iTunes Lookup API 응답 타입 ──────────────────────────────────────────
-interface LookupResult {
-  resultCount: number;
-  results: Array<{
-    trackName?: string;
-    artistName?: string;
-    artworkUrl512?: string;
-    artworkUrl100?: string;
-    primaryGenreName?: string;
-    trackViewUrl?: string;
-    averageUserRating?: number;
-    userRatingCount?: number;
-  }>;
+// ── RSS URL 생성 ─────────────────────────────────────────────────────────
+function buildRssUrl(appId: string, country: string, page: number): string {
+  if (page === 1) {
+    return `${RSS_BASE}/${country}/rss/customerreviews/id=${appId}/sortby=mostrecent/xml`;
+  }
+  return `${RSS_BASE}/${country}/rss/customerreviews/page=${page}/id=${appId}/sortby=mostrecent/xml`;
 }
 
 // ── 앱 정보 수집 (iTunes Lookup API) ────────────────────────────────────
-async function fetchAppInfo(appId: string): Promise<RawAppInfo> {
-  const url = `${LOOKUP_BASE}?id=${appId}&country=kr`;
+async function fetchAppInfo(appId: string, country: string): Promise<RawAppInfo> {
+  const url = `${LOOKUP_BASE}?id=${appId}&country=${country}`;
+  console.log(`[app-store] 앱 정보 조회: ${url}`);
+
   try {
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    if (!res.ok) throw new Error(`Lookup API ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const data: LookupResult = await res.json();
-    const app = data.results?.[0];
-    if (!app) throw new Error("앱 정보 없음");
+    const data = await res.json() as { resultCount: number; results: AnyObj[] };
+    const app  = data.results?.[0];
+    if (!app) throw new Error("results 없음");
 
+    console.log(`[app-store] 앱 정보 수집 성공: ${app.trackName}`);
     return {
-      name:         app.trackName      ?? appId,
-      developer:    app.artistName     ?? "Unknown",
-      icon:         app.artworkUrl512  ?? app.artworkUrl100 ?? "",
-      category:     app.primaryGenreName ?? "앱",
-      url:          app.trackViewUrl   ?? `https://apps.apple.com/kr/app/id${appId}`,
-      avgRating:    app.averageUserRating,
-      totalRatings: app.userRatingCount,
+      name:         String(app.trackName      ?? appId),
+      developer:    String(app.artistName     ?? "Unknown"),
+      icon:         String(app.artworkUrl512  ?? app.artworkUrl100 ?? ""),
+      category:     String(app.primaryGenreName ?? "앱"),
+      url:          String(app.trackViewUrl   ?? `https://apps.apple.com/${country}/app/id${appId}`),
+      avgRating:    typeof app.averageUserRating === "number" ? app.averageUserRating : undefined,
+      totalRatings: typeof app.userRatingCount   === "number" ? app.userRatingCount   : undefined,
     };
   } catch (err) {
     console.warn(`[app-store] 앱 정보 수집 실패, 기본값 사용:`, err);
@@ -88,109 +80,161 @@ async function fetchAppInfo(appId: string): Promise<RawAppInfo> {
       developer: "Unknown",
       icon:      "",
       category:  "앱",
-      url:       `https://apps.apple.com/kr/app/id${appId}`,
+      url:       `https://apps.apple.com/${country}/app/id${appId}`,
     };
   }
 }
 
-// ── 단일 페이지 RSS 수집 ─────────────────────────────────────────────────
-async function fetchPage(appId: string, page: number): Promise<RawReview[]> {
-  const url = `${RSS_BASE}/page=${page}/id=${appId}/sortby=mostrecent/json`;
+// ── 단일 페이지 XML 수집 + 파싱 ──────────────────────────────────────────
+async function fetchPage(appId: string, country: string, page: number): Promise<RawReview[]> {
+  const url = buildRssUrl(appId, country, page);
+  console.log(`[app-store] RSS fetch (page=${page}): ${url}`);
 
   const res = await fetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0",
-      "Accept":     "application/json",
+      "Accept":     "application/xml, text/xml, */*",
     },
   });
 
+  console.log(`[app-store] HTTP ${res.status} (page=${page})`);
+
   if (!res.ok) {
-    // 404 or 400 = 페이지 없음 → 조기 종료 신호
     if (res.status === 404 || res.status === 400) {
       console.log(`[app-store] fetch 실패: page=${page} HTTP ${res.status} — 페이지 없음, 수집 종료`);
       return [];
     }
-    throw new Error(`RSS 응답 오류: ${res.status} (page=${page})`);
+    const body = await res.text();
+    console.error(`[app-store] fetch 실패: page=${page} HTTP ${res.status} — body:\n${body.slice(0, 300)}`);
+    throw new Error(`RSS HTTP ${res.status}`);
   }
 
-  const data: RssFeed = await res.json();
-  const rawEntries = data?.feed?.entry;
-  if (!rawEntries) {
-    console.log(`[app-store] entry 없음: page=${page} — feed.entry가 존재하지 않음, 수집 종료`);
+  const xml = await res.text();
+
+  // ── XML 파싱 ──────────────────────────────────────────────────────
+  let parsed: AnyObj;
+  try {
+    parsed = xmlParser.parse(xml) as AnyObj;
+    console.log(`[app-store] XML 파싱 성공 (page=${page})`);
+  } catch (err) {
+    console.error(`[app-store] XML 파싱 실패 (page=${page}):`, err);
+    console.error(`[app-store] XML 앞부분:\n${xml.slice(0, 300)}`);
+    throw new Error(`XML 파싱 오류: ${err}`);
+  }
+
+  const feed    = parsed?.feed as AnyObj | undefined;
+  const entries = Array.isArray(feed?.entry) ? (feed.entry as AnyObj[]) : [];
+
+  if (entries.length === 0) {
+    console.log(`[app-store] entry 없음: page=${page} — feed.entry 미존재, 수집 종료`);
     return [];
   }
 
-  // entry는 단일 객체일 수도, 배열일 수도 있음
-  const entries: RssEntry[] = Array.isArray(rawEntries) ? rawEntries : [rawEntries];
+  // ── entry → RawReview 변환 ────────────────────────────────────────
+  // 리뷰 조건: im:rating + content(type=text) 모두 존재해야 함
+  const reviews: RawReview[] = [];
 
-  // 첫 번째 entry는 앱 메타정보(im:name 포함) → 리뷰 아님, 건너뜀
-  const reviewEntries = entries.filter((e) => !e["im:name"]);
+  for (const e of entries) {
+    // im:rating 없으면 앱 메타 entry → skip
+    const rawRating = e["im:rating"];
+    if (rawRating == null) {
+      console.log(`[app-store] skip entry (im:rating 없음): id=${e.id ?? "?"}`);
+      continue;
+    }
 
-  return reviewEntries.map((e): RawReview => {
-    const id     = e.id?.label ?? String(Math.random());
-    const text   = e.content?.label ?? "";
-    const rating = Number(e["im:rating"]?.label) || 3;
-    const author = e.author?.name?.label ?? "익명";
-    const dateStr = e.updated?.label ?? "";
-    const date   = dateStr ? new Date(dateStr) : new Date();
-    const version = e["im:version"]?.label;
+    // content 배열에서 type="text" 추출
+    const contentArr: AnyObj[] = Array.isArray(e.content)
+      ? e.content
+      : e.content != null ? [e.content] : [];
 
-    return {
-      id,
+    const textEntry = contentArr.find((c) => c["@_type"] === "text");
+    // stopNodes를 사용했으므로 텍스트가 #text 또는 문자열 직접값으로 올 수 있음
+    const text = String(
+      textEntry?.["#text"] ??
+      (typeof textEntry === "string" ? textEntry : "") ??
+      ""
+    ).trim();
+
+    if (!text) {
+      console.log(`[app-store] skip entry (content.text 없음): id=${e.id ?? "?"}`);
+      continue;
+    }
+
+    // author
+    const authorName = String(e.author?.name ?? "익명");
+
+    // date
+    const dateStr = String(e.updated ?? "");
+    const date    = dateStr ? new Date(dateStr) : new Date();
+
+    reviews.push({
+      id:         String(e.id ?? Math.random()),
       text,
-      rating: Math.min(5, Math.max(1, rating)),
-      date: isNaN(date.getTime()) ? new Date() : date,
-      author,
-      version,
+      rating:     Math.min(5, Math.max(1, Number(rawRating))),
+      date:       isNaN(date.getTime()) ? new Date() : date,
+      author:     authorName,
+      version:    e["im:version"] != null ? String(e["im:version"]) : undefined,
       sortSource: "newest",
-    };
-  });
+    });
+  }
+
+  console.log(`[app-store] page=${page}: ${reviews.length}개 리뷰 추출 (전체 entry: ${entries.length})`);
+  return reviews;
 }
 
 // ── 전체 페이지 순차 수집 ───────────────────────────────────────────────
-async function fetchAllReviews(appId: string): Promise<RawReview[]> {
-  const all: RawReview[] = [];
-  const seen = new Set<string>();
+async function fetchAllReviews(appId: string, country: string): Promise<RawReview[]> {
+  const all  = new Map<string, RawReview>(); // id → RawReview (중복 제거)
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     let pageReviews: RawReview[];
     try {
-      pageReviews = await fetchPage(appId, page);
+      pageReviews = await fetchPage(appId, country, page);
     } catch (err) {
-      console.warn(`[app-store] page=${page} 수집 실패, 중단:`, err);
+      console.error(`[app-store] page=${page} 수집 실패, 수집 중단:`, err);
       break;
     }
 
-    // 빈 페이지 = 더 이상 데이터 없음
     if (pageReviews.length === 0) {
       console.log(`[app-store] page=${page} 빈 페이지 — 수집 종료`);
       break;
     }
 
-    // 중복 제거
     for (const r of pageReviews) {
-      if (!seen.has(r.id)) {
-        seen.add(r.id);
-        all.push(r);
-      }
+      if (!all.has(r.id)) all.set(r.id, r);
     }
 
-    console.log(`[app-store] page=${page}: ${pageReviews.length}개 수집 (누계: ${all.length})`);
+    console.log(`[app-store] 누계: ${all.size}개`);
   }
 
-  return all;
+  const result = [...all.values()];
+  console.log(`[app-store] 최종 수집 완료: ${result.length}개 리뷰`);
+  return result;
 }
 
-// ── AppStoreAdapter 구현 ─────────────────────────────────────────────────
+// ── AppStoreAdapter ──────────────────────────────────────────────────────
 export class AppStoreAdapter implements StoreAdapter {
   readonly storeType = "app_store" as const;
 
-  async fetch(appId: string, _options?: FetchOptions): Promise<AdapterResult> {
-    // 앱 정보와 리뷰를 병렬 수집
+  /**
+   * @param appId   숫자 App ID (예: "839333328")
+   * @param options country 필드에 App Store URL 국가코드 전달 가능 (기본: "kr")
+   */
+  async fetch(appId: string, options?: FetchOptions): Promise<AdapterResult> {
+    const country = options?.country ?? "kr";
+
+    console.log(`\n[app-store] ── 수집 시작 ────────────────────────`);
+    console.log(`[app-store] store detection: App Store`);
+    console.log(`[app-store] extracted app id: ${appId}`);
+    console.log(`[app-store] country: ${country}`);
+
+    // 앱 정보 + 리뷰 병렬 수집
     const [appInfo, reviews] = await Promise.all([
-      fetchAppInfo(appId),
-      fetchAllReviews(appId),
+      fetchAppInfo(appId, country),
+      fetchAllReviews(appId, country),
     ]);
+
+    console.log(`[app-store] ── 수집 완료 ────────────────────────\n`);
 
     return {
       appInfo,
@@ -199,12 +243,12 @@ export class AppStoreAdapter implements StoreAdapter {
       storeType: "app_store",
       stats: {
         newestFetched: reviews.length,
-        ratingFetched: 0,           // RSS는 단일 정렬 — rating 별도 수집 없음
+        ratingFetched: 0,
         totalUnique:   reviews.length,
       },
     };
   }
 }
 
-// 싱글톤 인스턴스
 export const appStoreAdapter = new AppStoreAdapter();
+export { extractCountry };
