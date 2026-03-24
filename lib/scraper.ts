@@ -18,6 +18,8 @@ import { buildAnalysisReport } from "@/lib/analysis/builder";
 // ── 환경변수 ─────────────────────────────────────────────────────────────
 // .env.local 에 GOOGLE_PLAY_ENABLED=true 를 추가하면 실제 수집 활성화
 const GOOGLE_PLAY_ENABLED = process.env.GOOGLE_PLAY_ENABLED === "true";
+// .env.local 에 APP_STORE_ENABLED=true 를 추가하면 실제 수집 활성화
+const APP_STORE_ENABLED = process.env.APP_STORE_ENABLED === "true";
 
 // ── 어댑터 레지스트리 ─────────────────────────────────────────────────────
 // 📌 새로운 스토어 추가 시 여기에 등록
@@ -26,11 +28,10 @@ async function getAdapter(storeType: "google_play" | "app_store"): Promise<Store
     const { googlePlayAdapter } = await import("@/lib/adapters/google-play");
     return googlePlayAdapter;
   }
-  // 📌 App Store 어댑터 추가 예정
-  // if (storeType === "app_store") {
-  //   const { appStoreAdapter } = await import("@/lib/adapters/app-store");
-  //   return appStoreAdapter;
-  // }
+  if (storeType === "app_store") {
+    const { appStoreAdapter } = await import("@/lib/adapters/app-store");
+    return appStoreAdapter;
+  }
   return null;
 }
 
@@ -53,7 +54,8 @@ export async function scrape(
 
   // ── 실제 수집 시도 ───────────────────────────────────────────────────
   const isEnabled =
-    storeType === "google_play" ? GOOGLE_PLAY_ENABLED : false; // App Store는 아직 비활성
+    storeType === "google_play" ? GOOGLE_PLAY_ENABLED :
+    storeType === "app_store"   ? APP_STORE_ENABLED   : false;
 
   if (isEnabled) {
     try {
@@ -80,9 +82,10 @@ export async function scrape(
       console.warn(`[scraper] 실제 수집 실패, mock fallback으로 전환:`, err);
     }
   } else {
+    const envKey = storeType === "google_play" ? "GOOGLE_PLAY_ENABLED" : "APP_STORE_ENABLED";
     console.log(
       `[scraper] 실제 수집 비활성 (${storeType}). mock 반환. ` +
-      `활성화하려면 .env.local에 GOOGLE_PLAY_ENABLED=true 추가`
+      `활성화하려면 .env.local에 ${envKey}=true 추가`
     );
   }
 

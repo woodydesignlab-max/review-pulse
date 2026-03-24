@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:app-store": "tsx scripts/test-app-store.ts"
   },
   "dependencies": {
     "google-play-scraper": "^10.1.2",
