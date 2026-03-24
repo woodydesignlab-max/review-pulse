@@ -53,15 +53,38 @@ const IconTrend = () => (
 );
 
 export default function DashboardPage() {
-  const [data, setData]     = useState<AnalysisReport | null>(null);
-  const [error, setError]   = useState(false);
-  const [period, setPeriod] = useState<PeriodKey>("30d");
+  const [data, setData]         = useState<AnalysisReport | null>(null);
+  const [error, setError]       = useState<string | null>(null);
+  const [debugRaw, setDebugRaw] = useState<string | null>(null);
+  const [period, setPeriod]     = useState<PeriodKey>("30d");
 
   useEffect(() => {
-    const raw = sessionStorage.getItem("analysisResult");
-    if (!raw) { setError(true); return; }
+    console.log("[dashboard] useEffect 실행");
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem("analysisResult");
+    } catch (e) {
+      console.error("[dashboard] sessionStorage 접근 실패:", e);
+      setError("sessionStorage 접근 실패 — 브라우저 설정 확인");
+      return;
+    }
+    console.log("[dashboard] sessionStorage 결과:", raw ? `${raw.length}자 존재` : "null (비어있음)");
+    setDebugRaw(raw);
+
+    if (!raw) {
+      console.error("[dashboard] analysisResult 없음 — 에러 화면 표시");
+      setError("analysisResult 없음");
+      return;
+    }
     try {
       const parsed: AnalysisReport = JSON.parse(raw);
+      console.log("[dashboard] 파싱 성공 —", {
+        app: parsed.app?.name,
+        store: parsed.app?.store,
+        sampleCount: parsed.summary?.sampleCount,
+        hasTrendData: !!parsed.trendData,
+        hasInsights: !!parsed.insights,
+      });
       setData(parsed);
       trackEvent("view_result", {
         app_name: parsed.app.name,
@@ -70,7 +93,10 @@ export default function DashboardPage() {
         sample_avg_rating: parsed.summary.sampleAvgRating,
         negative_ratio: parsed.summary.negativeRatio,
       });
-    } catch { setError(true); }
+    } catch (e) {
+      console.error("[dashboard] JSON.parse 실패:", e, "\nraw 앞 200자:", raw?.slice(0, 200));
+      setError(`JSON 파싱 실패: ${e}`);
+    }
   }, []);
 
   // ── Error state ──────────────────────────────────────────────────────
@@ -85,9 +111,15 @@ export default function DashboardPage() {
             </svg>
           </div>
           <h2 className="text-[18px] font-bold text-[#111827] mb-2">분석 결과가 없어요</h2>
-          <p className="text-[14px] text-[#6B7280] leading-relaxed mb-6">
+          <p className="text-[14px] text-[#6B7280] leading-relaxed mb-4">
             분석 결과는 분석 완료 직후에만 볼 수 있어요.<br />
             앱 링크를 입력해서 새로 분석을 시작해보세요.
+          </p>
+          {/* 디버그: 실패 원인 표시 */}
+          <p className="text-[11px] text-[#EF4444] bg-[#FEF2F2] border border-[#FECACA] rounded-lg px-3 py-2 mb-4 text-left font-mono break-all">
+            원인: {error}
+            {debugRaw && <><br />raw: {debugRaw.slice(0, 100)}{debugRaw.length > 100 ? "…" : ""}</>}
+            {!debugRaw && <><br />sessionStorage가 비어있음</>}
           </p>
           <a href="/"
             className="inline-flex items-center gap-2 bg-[#3182F6] text-white text-[14px] font-semibold px-6 py-3 rounded-xl hover:bg-[#2563EB] transition-colors"
@@ -126,6 +158,16 @@ export default function DashboardPage() {
       <Header showBack appName={app.name} />
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
+
+        {/* ── [진단용] 데이터 덤프 — 렌더 체인 확인 후 제거 ───────── */}
+        <details className="bg-[#1E1E1E] text-[#D4D4D4] rounded-xl text-[11px] font-mono">
+          <summary className="px-4 py-2 cursor-pointer text-[#9CDCFE] select-none">
+            🔍 Debug: report data ({app.store} / {summary.sampleCount}개 리뷰)
+          </summary>
+          <pre className="px-4 pb-4 overflow-auto max-h-64 whitespace-pre-wrap break-all">
+            {JSON.stringify({ app, summary: { ...summary }, trendDataKeys: Object.keys(trendData ?? {}) }, null, 2)}
+          </pre>
+        </details>
 
         {/* ── App Info Card ──────────────────────────────────────────── */}
         <div className="bg-white border border-[#EAECF0] rounded-2xl overflow-hidden">

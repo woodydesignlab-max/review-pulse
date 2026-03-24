@@ -76,12 +76,26 @@ function LoadingContent() {
           negative_ratio: data.summary.negativeRatio,
         });
         // Store result for dashboard to consume
-        sessionStorage.setItem("analysisResult", JSON.stringify(data));
+        const serialized = JSON.stringify(data);
+        sessionStorage.setItem("analysisResult", serialized);
         sessionStorage.setItem("analysisUrl", decodedUrl);
+        console.log("[analyze] sessionStorage 저장 완료 — bytes:", serialized.length);
+        console.log("[analyze] 검증:", {
+          hasApp: !!data.app,
+          appName: data.app?.name,
+          appStore: data.app?.store,
+          hasSummary: !!data.summary,
+          hasTrendData: !!data.trendData,
+          hasInsights: !!data.insights,
+        });
         // Ensure all steps complete visually before redirecting
         setCurrentStep(STEPS.length - 1);
         setIsDone(true);
-        setTimeout(() => router.push("/dashboard"), 700);
+        console.log("[analyze] router.push('/dashboard') 예약 (700ms 후)");
+        setTimeout(() => {
+          console.log("[analyze] router.push('/dashboard') 실행");
+          router.push("/dashboard");
+        }, 700);
       })
       .catch((err: unknown) => {
         const msg = typeof err === "string" ? err : "분석 중 오류가 발생했습니다.";
