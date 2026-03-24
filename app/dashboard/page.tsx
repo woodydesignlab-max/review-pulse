@@ -159,15 +159,17 @@ export default function DashboardPage() {
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-5">
 
-        {/* ── [진단용] 데이터 덤프 — 렌더 체인 확인 후 제거 ───────── */}
-        <details className="bg-[#1E1E1E] text-[#D4D4D4] rounded-xl text-[11px] font-mono">
-          <summary className="px-4 py-2 cursor-pointer text-[#9CDCFE] select-none">
-            🔍 Debug: report data ({app.store} / {summary.sampleCount}개 리뷰)
-          </summary>
-          <pre className="px-4 pb-4 overflow-auto max-h-64 whitespace-pre-wrap break-all">
-            {JSON.stringify({ app, summary: { ...summary }, trendDataKeys: Object.keys(trendData ?? {}) }, null, 2)}
-          </pre>
-        </details>
+        {/* ── [진단용] dev 환경에서만 표시 ─────────────────────── */}
+        {process.env.NODE_ENV === "development" && (
+          <details className="bg-[#1E1E1E] text-[#D4D4D4] rounded-xl text-[11px] font-mono">
+            <summary className="px-4 py-2 cursor-pointer text-[#9CDCFE] select-none">
+              🔍 Debug: {app.store} / sampleCount={summary.sampleCount} / source 확인
+            </summary>
+            <pre className="px-4 pb-4 overflow-auto max-h-64 whitespace-pre-wrap break-all">
+              {JSON.stringify({ app, summary: { ...summary }, trendDataKeys: Object.keys(trendData ?? {}) }, null, 2)}
+            </pre>
+          </details>
+        )}
 
         {/* ── App Info Card ──────────────────────────────────────────── */}
         <div className="bg-white border border-[#EAECF0] rounded-2xl overflow-hidden">

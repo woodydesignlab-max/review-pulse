@@ -91,5 +91,11 @@ export async function scrape(
   }
 
   // ── Mock fallback ────────────────────────────────────────────────────
-  return { report: mockTemplate, source: "mock" };
+  // mock 데이터의 store 레이블을 실제 요청 스토어에 맞게 보정
+  const storeLabel = storeType === "app_store" ? "App Store" : "Google Play";
+  const patchedMock: AnalysisReport = {
+    ...mockTemplate,
+    app: { ...mockTemplate.app, store: storeLabel },
+  };
+  return { report: patchedMock, source: "mock" };
 }
