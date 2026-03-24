@@ -50,14 +50,22 @@ export default function LandingPage() {
     {
       name: "카카오뱅크",
       url: "https://play.google.com/store/apps/details?id=com.kakaobank.channel",
+      store: "Google Play",
     },
     {
       name: "토스",
       url: "https://play.google.com/store/apps/details?id=viva.republica.toss",
+      store: "Google Play",
     },
     {
-      name: "배달의민족",
-      url: "https://play.google.com/store/apps/details?id=com.example.baemin",
+      name: "토스 (iOS)",
+      url: "https://apps.apple.com/kr/app/%ED%86%A0%EC%8A%A4/id839333328",
+      store: "App Store",
+    },
+    {
+      name: "카카오뱅크 (iOS)",
+      url: "https://apps.apple.com/kr/app/%EC%B9%B4%EC%B9%B4%EC%98%A4%EB%B1%85%ED%81%AC/id1258016944",
+      store: "App Store",
     },
   ];
 
@@ -247,8 +255,13 @@ export default function LandingPage() {
                   setUrl(app.url);
                   setError("");
                 }}
-                className="text-[13px] text-[#374151] bg-[#F3F4F6] hover:bg-[#E5E7EB] px-3 py-1.5 rounded-full transition-colors border border-[#E5E7EB]"
+                className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full transition-colors border ${
+                  app.store === "App Store"
+                    ? "text-[#0071E3] bg-[#F0F7FF] hover:bg-[#DBEAFE] border-[#BFDBFE]"
+                    : "text-[#374151] bg-[#F3F4F6] hover:bg-[#E5E7EB] border-[#E5E7EB]"
+                }`}
               >
+                <span className="text-[10px] opacity-60">{app.store === "App Store" ? "🍎" : "▶"}</span>
                 {app.name}
               </button>
             ))}

@@ -80,11 +80,23 @@ function LoadingContent() {
 
   const progress = isDone ? 100 : Math.round(((currentStep) / (STEPS.length - 1)) * 85);
 
+  // Detect store type from URL
+  const getStoreType = (u: string): "Google Play" | "App Store" | null => {
+    if (u.includes("play.google.com")) return "Google Play";
+    if (u.includes("apps.apple.com")) return "App Store";
+    return null;
+  };
+
   // Detect app name from URL for display
   const getAppName = (u: string) => {
     if (u.includes("kakaobank")) return "카카오뱅크";
     if (u.includes("toss") || u.includes("viva.republica")) return "토스";
     if (u.includes("baemin") || u.includes("woowa")) return "배달의민족";
+    // App Store URL: extract name segment between /app/ and /id
+    if (u.includes("apps.apple.com")) {
+      const match = u.match(/\/app\/([^/]+)\/id/);
+      if (match) return decodeURIComponent(match[1].replace(/-/g, " "));
+    }
     return "앱 분석 중";
   };
 
@@ -113,9 +125,20 @@ function LoadingContent() {
         {/* App info row */}
         <div className="flex items-center gap-3 mb-8 p-4 bg-[#F9FAFB] rounded-2xl border border-[#EAECF0]">
           <div className="w-12 h-12 bg-[#FDE300] rounded-xl flex items-center justify-center text-xl shrink-0">🏦</div>
-          <div className="min-w-0">
-            <div className="text-[15px] font-semibold text-[#111827]">{getAppName(decodedUrl)}</div>
-            <div className="text-[12px] text-[#9CA3AF] truncate">{decodedUrl}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-[15px] font-semibold text-[#111827]">{getAppName(decodedUrl)}</div>
+              {getStoreType(decodedUrl) && (
+                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${
+                  getStoreType(decodedUrl) === "App Store"
+                    ? "bg-[#F0F7FF] text-[#0071E3] border-[#BFDBFE]"
+                    : "bg-[#F0FDF4] text-[#16A34A] border-[#A7F3D0]"
+                }`}>
+                  {getStoreType(decodedUrl)}
+                </span>
+              )}
+            </div>
+            <div className="text-[12px] text-[#9CA3AF] truncate mt-0.5">{decodedUrl}</div>
           </div>
         </div>
 

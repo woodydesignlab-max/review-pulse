@@ -106,13 +106,19 @@ async function fetchPage(appId: string, page: number): Promise<RawReview[]> {
 
   if (!res.ok) {
     // 404 or 400 = 페이지 없음 → 조기 종료 신호
-    if (res.status === 404 || res.status === 400) return [];
+    if (res.status === 404 || res.status === 400) {
+      console.log(`[app-store] fetch 실패: page=${page} HTTP ${res.status} — 페이지 없음, 수집 종료`);
+      return [];
+    }
     throw new Error(`RSS 응답 오류: ${res.status} (page=${page})`);
   }
 
   const data: RssFeed = await res.json();
   const rawEntries = data?.feed?.entry;
-  if (!rawEntries) return [];
+  if (!rawEntries) {
+    console.log(`[app-store] entry 없음: page=${page} — feed.entry가 존재하지 않음, 수집 종료`);
+    return [];
+  }
 
   // entry는 단일 객체일 수도, 배열일 수도 있음
   const entries: RssEntry[] = Array.isArray(rawEntries) ? rawEntries : [rawEntries];
