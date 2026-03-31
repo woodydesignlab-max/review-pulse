@@ -13,15 +13,13 @@ export default function LandingPage() {
     const trimmed = input.trim();
     if (!trimmed) return "앱 링크를 입력해주세요.";
 
-    // URL 형식 자체가 아닌 경우
     try { new URL(trimmed); } catch {
       return "올바른 URL 형식이 아닙니다. http:// 또는 https://로 시작하는 링크를 붙여넣으세요.";
     }
 
-    if (trimmed.includes("play.google.com/store/apps")) return null; // valid
-    if (trimmed.includes("apps.apple.com")) return null; // valid
+    if (trimmed.includes("play.google.com/store/apps")) return null;
+    if (trimmed.includes("apps.apple.com")) return null;
 
-    // 다른 도메인인 경우 힌트 포함
     if (trimmed.includes("google.com") || trimmed.includes("play.google.com")) {
       return "Google Play 앱 페이지 링크를 입력해주세요. (예: play.google.com/store/apps/details?id=...)";
     }
@@ -33,45 +31,21 @@ export default function LandingPage() {
 
   const submitAnalyze = (targetUrl: string) => {
     const validationError = validateUrl(targetUrl);
-    if (validationError) {
-      setError(validationError);
-      console.warn("[analyze] validation fail:", validationError, targetUrl);
-      return;
-    }
+    if (validationError) { setError(validationError); return; }
     setError("");
     const storeLabel = targetUrl.includes("apps.apple.com") ? "App Store" : "Google Play";
-    console.log("[analyze] submit:", storeLabel, targetUrl);
     trackEvent("analyze_click", { app_id: targetUrl, store: storeLabel });
     router.push(`/loading?url=${encodeURIComponent(targetUrl)}`);
   };
 
   const handleAnalyze = () => submitAnalyze(url.trim());
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleAnalyze();
-  };
+  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === "Enter") handleAnalyze(); };
 
   const exampleApps = [
-    {
-      name: "카카오뱅크",
-      url: "https://play.google.com/store/apps/details?id=com.kakaobank.channel",
-      store: "Google Play",
-    },
-    {
-      name: "토스",
-      url: "https://play.google.com/store/apps/details?id=viva.republica.toss",
-      store: "Google Play",
-    },
-    {
-      name: "토스 (iOS)",
-      url: "https://apps.apple.com/kr/app/%ED%86%A0%EC%8A%A4/id839333328",
-      store: "App Store",
-    },
-    {
-      name: "카카오뱅크 (iOS)",
-      url: "https://apps.apple.com/kr/app/%EC%B9%B4%EC%B9%B4%EC%98%A4%EB%B1%85%ED%81%AC/id1258016944",
-      store: "App Store",
-    },
+    { name: "카카오뱅크", url: "https://play.google.com/store/apps/details?id=com.kakaobank.channel" },
+    { name: "토스", url: "https://play.google.com/store/apps/details?id=viva.republica.toss" },
+    { name: "토스 iOS", url: "https://apps.apple.com/kr/app/%ED%86%A0%EC%8A%A4/id839333328" },
+    { name: "카카오뱅크 iOS", url: "https://apps.apple.com/kr/app/%EC%B9%B4%EC%B9%B4%EC%98%A4%EB%B1%85%ED%81%AC/id1258016944" },
   ];
 
   const features = [
@@ -192,7 +166,7 @@ export default function LandingPage() {
                 value={url}
                 onChange={(e) => {
                   setUrl(e.target.value);
-                  if (error) setError(""); // 타이핑 시작하면 에러 지우기
+                  if (error) setError("");
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="Google Play 또는 App Store 링크를 붙여넣으세요"
@@ -200,10 +174,7 @@ export default function LandingPage() {
               />
               {url && (
                 <button
-                  onClick={() => {
-                    setUrl("");
-                    setError("");
-                  }}
+                  onClick={() => { setUrl(""); setError(""); }}
                   className="text-[#9CA3AF] hover:text-[#6B7280] transition-colors"
                 >
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -235,7 +206,7 @@ export default function LandingPage() {
             분석 시작하기
           </button>
 
-          {/* Sample report button — goes through loading so sessionStorage gets populated */}
+          {/* Sample report button */}
           <button
             onClick={() => {
               const sampleUrl = "https://play.google.com/store/apps/details?id=com.kakaobank.channel";
@@ -257,13 +228,8 @@ export default function LandingPage() {
               <button
                 key={app.name}
                 onClick={() => submitAnalyze(app.url)}
-                className={`flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full transition-colors border ${
-                  app.store === "App Store"
-                    ? "text-[#0071E3] bg-[#F0F7FF] hover:bg-[#DBEAFE] border-[#BFDBFE]"
-                    : "text-[#374151] bg-[#F3F4F6] hover:bg-[#E5E7EB] border-[#E5E7EB]"
-                }`}
+                className="text-[13px] text-[#374151] bg-[#F3F4F6] hover:bg-[#E5E7EB] px-3 py-1.5 rounded-full transition-colors border border-[#E5E7EB]"
               >
-                <span className="text-[10px] opacity-60">{app.store === "App Store" ? "🍎" : "▶"}</span>
                 {app.name}
               </button>
             ))}
